@@ -1,4 +1,190 @@
-# OP Codes
+# Frontier Enemy AI Behaviour
+
+Every monster has a bunch of base command tables based on the monster ID and map ID. The game loads a bunch of base tables, then a bunch of behavior tables (area/unko/ikari) and a bunch of subtables for attack/fly/move sequences. Then Frontier does its thing and overrides each of those base tables with dozens of random tables all over the place based on events/variants/quest rank/quest ID.
+
+## What does it look like
+
+The command tables describe a basic ISA or ASM-like interpreted language. Each instruction starts with an opcode mapping to a specific function in the main handler; each opcode can have one or more parameters attached to it. There are logical families of opcodes (IF/ELSE, SWITCH), control flow with returns (JUMP/CALL), and setters. 
+To parse through a command table, given the lengths of every opcode, you simply walk through it and jump by opcode length till we find a return (opcode 0xFF) at depth = 0.
+
+## Example Rathian base sequence 
+
+This is the raw data for Rathian, Jungle base sequence : 
+
+```
+0000  79 00 01 04 79 01 01 39  00 0b 00 00 05 00 06 00
+0010  0b 01 80 00 03 80 01 12  05 03 06 00 80 02 04 05
+0020  03 00 00 80 03 0a 05 03  0f 00 80 ff 0b 02 ff 00
+0030  39 02 79 02 39 00 0b 00  00 05 00 06 00 0b 01 80
+0040  00 03 80 01 10 05 00 11  00 80 02 08 05 03 06 00
+0050  80 03 08 05 03 03 00 80  ff 0b 02 ff 00 39 02 79
+0060  03 1b 00 01 0c 04 01 81  07 2b 00 04 01 ff 00 2b
+0070  02 1b 02 0b 00 00 07 01  0b 01 07 02 0b 02 ff 00
+```
+
+ If we walk through it, accounting for opcode length and blocks we have something like that : 
+ ```
+79 00 01 04 79 01 01       # unique_sel ; SWITCH header
+  39 00                    # eye_dmg_ck ; IF
+    0b 00 00               # mode_ck ; IF
+      05 00 06 00          # act_set
+    0b 01                  # mode_ck ; ELSE
+      80 00 03 80 01 12    # rnd32 ; RND header
+        05 03 06 00        # act_set
+        80 02 04           # rnd32 ; weight
+          05 03 00 00      # act_set
+        80 03 0a           # rnd32 ; weight
+          05 03 0f 00      # act_set
+      80 ff                # rnd32 ; RND end
+    0b 02                  # mode_ck ; ENDIF
+    ff 00                  # END
+  39 02                    # eye_dmg_ck ; ENDIF
+  79 02                    # unique_sel ; default
+    39 00                  # eye_dmg_ck ; IF
+      0b 00 00             # mode_ck ; IF
+        05 00 06 00        # act_set
+      0b 01                # mode_ck ; ELSE
+        80 00 03 80 01 10  # rnd32 ; RND header
+          05 00 11 00      # act_set
+          80 02 08         # rnd32 ; weight
+            05 03 06 00    # act_set
+          80 03 08         # rnd32 ; weight
+            05 03 03 00    # act_set
+        80 ff              # rnd32 ; RND end
+      0b 02                # mode_ck ; ENDIF
+      ff 00                # END
+    39 02                  # eye_dmg_ck ; ENDIF
+79 03                      # unique_sel ; SWITCH end
+1b 00 01                   # mind_ck ; IF
+  0c 04 01                 # flag_set
+  81 07                    # contents
+  2b 00 04 01              # flag_ck ; IF
+    ff 00                  # END
+  2b 02                    # flag_ck ; ENDIF
+1b 02                      # mind_ck ; ENDIF
+0b 00 00                   # mode_ck ; IF
+  07 01                    # main_jump
+0b 01                      # mode_ck ; ELSE
+  07 02                    # main_jump
+0b 02                      # mode_ck ; ENDIF
+ff 00                      # END
+```
+
+With a basic decoder we can make the flow more readable : 
+
+```
+  SWITCH unique(q=4):
+      case 1:
+          IF eye_damaged:
+              IF mode == 0:
+                  ACT 0, 6   ; yield
+              ELSE:
+                  RND32:
+                      weight 18:
+                          ACT 3, 6   ; yield
+                      weight 4:
+                          ACT 3, 0   ; yield
+                      weight 10:
+                          ACT 3, 15   ; yield
+                  ENDRND
+              ENDIF
+              END
+          ENDIF
+      DEFAULT:
+          IF eye_damaged:
+              IF mode == 0:
+                  ACT 0, 6   ; yield
+              ELSE:
+                  RND32:
+                      weight 16:
+                          ACT 0, 17   ; yield
+                      weight 8:
+                          ACT 3, 6   ; yield
+                      weight 8:
+                          ACT 3, 3   ; yield
+                  ENDRND
+              ENDIF
+              END
+          ENDIF
+  ENDSWITCH
+  IF mind == 1:
+      flag_set 04 01
+      CALL area[7]
+      IF flag[4] == 1:
+          END
+      ENDIF
+  ENDIF
+  IF mode == 0:
+      JMP  main[1]
+  ELSE:
+      JMP  main[2]
+  ENDIF
+  END
+```
+
+This is what it would look like with a fancier decoder 
+
+```
+fn main_0() {                  // main[0] @ 0x101452cc, 128 bytes
+  switch (unique(q=4)) {
+    1 => {
+      if (eye_damaged) {
+        if (mode == 0) {
+          act(ACT, 6, 0)  // em_act06
+        } else {
+          random /* roll 0..31 */ {
+            weight 18 => {
+              act(ATTACK, 6, 0)  // em_atk06
+            }
+            weight 4 => {
+              act(ATTACK, 0, 0)  // em_atk00
+            }
+            weight 10 => {
+              act(ATTACK, 15, 0)  // em_atk15
+            }
+          }
+        }
+        return 0  // main (restart base[0])
+      }
+    }
+    default => {
+      if (eye_damaged) {
+        if (mode == 0) {
+          act(ACT, 6, 0)  // em_act06
+        } else {
+          random /* roll 0..31 */ {
+            weight 16 => {
+              act(ACT, 17, 0)  // em_act17
+            }
+            weight 8 => {
+              act(ATTACK, 6, 0)  // em_atk06
+            }
+            weight 8 => {
+              act(ATTACK, 3, 0)  // em_atk03
+            }
+          }
+        }
+        return 0  // main (restart base[0])
+      }
+    }
+  }
+  if (mind == 1) {
+    flag_set(0x04, 0x01)
+    area_7()
+    if (flag[4] == 1) {
+      return 0  // main (restart base[0])
+    }
+  }
+  if (mode == 0) {
+    jump main_1()
+  } else {
+    jump main_2()
+  }
+  return 0  // main (restart base[0])
+}
+```
+
+## OP Codes
 
 | op   | name                           | len     | example                       | notes                                                                                                                                                  |
 | ---- | ------------------------------ | ------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -140,3 +326,7 @@
 | 0x9B | em_cmd_tgt_jump_pl_ck          | 2       | `9B 00 … 9B 02`               | if/else/endif block, is the target player in air                                                                                                       |
 | 0x9C | em_cmd_tgt_jimen_height_ck     | 3/2/2   | `9C 00 01 … 9C 02`            | if/else/endif block, target on the ground near home height                                                                                             |
 | 0xFF | em_cmd_end_command             | 2       | `FF 00`                       | RET / end of block (`FF 00` END/restart, `FF 01/02/03` RET to caller)                                                                                  |
+
+## Methodology
+
+Reversed mainly through static analysis on the PC dll of Monster Hunter Frontier Z, debug symbols validated through the WiiU dissassembly of the game.
