@@ -4,8 +4,12 @@ Every monster has a bunch of base command tables based on the monster ID and map
 
 ## What does it look like
 
-The command tables describe a basic ISA or ASM-like interpreted language. Each instruction starts with an opcode mapping to a specific function in the main handler; each opcode can have one or more parameters attached to it. There are logical families of opcodes (IF/ELSE, SWITCH), control flow with returns (JUMP/CALL), and setters. 
+The command tables describe a basic ISA or ASM-like interpreted language. Each instruction starts with an opcode mapping to a specific function in the main handler; each opcode can have one or more parameters attached to it. There are logical families of opcodes (IF/ELSE, SWITCH), control flow with returns (JUMP/CALL), setters, random chance selectors, range based checks... 
 To parse through a command table, given the lengths of every opcode, you simply walk through it and jump by opcode length till we find a return (opcode 0xFF) at depth = 0.
+
+## in Code flow
+
+The game keeps track of a program counter; every frame, the program checks where we are in the current sequence, executes the current opcode handler, and then advances to the next opcode, up to 1000 commands per frame. The main state changes happen through command 0x05 em_cmd_act_set, which dispatches a main_state and a sub_state and tells the monster to come back specifically to this point in the execution flow once it's done with the action, essentially yielding/corouting behavior.
 
 ## Example Rathian base sequence 
 
