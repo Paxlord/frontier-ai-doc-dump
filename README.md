@@ -28,7 +28,8 @@ This is the raw data for Rathian, Jungle base sequence :
 
  If we walk through it, accounting for opcode length and blocks we have something like that : 
  ```
-79 00 01 04 79 01 01      # unique_sel ; SWITCH header
+79 00 01 04               # unique_sel ; SWITCH header
+79 01 01                  # unique_sel ; case 1
   39 00                   # eye_dmg_ck ; IF
     0b 00 00              # mode_ck ; IF
       05 00 06 00         # act_set
