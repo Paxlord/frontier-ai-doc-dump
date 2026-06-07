@@ -28,50 +28,52 @@ This is the raw data for Rathian, Jungle base sequence :
 
  If we walk through it, accounting for opcode length and blocks we have something like that : 
  ```
-79 00 01 04 79 01 01       # unique_sel ; SWITCH header
-  39 00                    # eye_dmg_ck ; IF
-    0b 00 00               # mode_ck ; IF
-      05 00 06 00          # act_set
-    0b 01                  # mode_ck ; ELSE
-      80 00 03 80 01 12    # rnd32 ; RND header
-        05 03 06 00        # act_set
-        80 02 04           # rnd32 ; weight
-          05 03 00 00      # act_set
-        80 03 0a           # rnd32 ; weight
-          05 03 0f 00      # act_set
-      80 ff                # rnd32 ; RND end
-    0b 02                  # mode_ck ; ENDIF
-    ff 00                  # END
-  39 02                    # eye_dmg_ck ; ENDIF
-  79 02                    # unique_sel ; default
-    39 00                  # eye_dmg_ck ; IF
-      0b 00 00             # mode_ck ; IF
-        05 00 06 00        # act_set
-      0b 01                # mode_ck ; ELSE
-        80 00 03 80 01 10  # rnd32 ; RND header
-          05 00 11 00      # act_set
-          80 02 08         # rnd32 ; weight
-            05 03 06 00    # act_set
-          80 03 08         # rnd32 ; weight
-            05 03 03 00    # act_set
-        80 ff              # rnd32 ; RND end
-      0b 02                # mode_ck ; ENDIF
-      ff 00                # END
-    39 02                  # eye_dmg_ck ; ENDIF
-79 03                      # unique_sel ; SWITCH end
-1b 00 01                   # mind_ck ; IF
-  0c 04 01                 # flag_set
-  81 07                    # contents
-  2b 00 04 01              # flag_ck ; IF
-    ff 00                  # END
-  2b 02                    # flag_ck ; ENDIF
-1b 02                      # mind_ck ; ENDIF
-0b 00 00                   # mode_ck ; IF
-  07 01                    # main_jump
-0b 01                      # mode_ck ; ELSE
-  07 02                    # main_jump
-0b 02                      # mode_ck ; ENDIF
-ff 00                      # END
+79 00 01 04 79 01 01      # unique_sel ; SWITCH header
+  39 00                   # eye_dmg_ck ; IF
+    0b 00 00              # mode_ck ; IF
+      05 00 06 00         # act_set
+    0b 01                 # mode_ck ; ELSE
+      80 00 03            # rnd32; RND header
+        80 01 12          # rnd32; weight
+          05 03 06 00     # act_set
+        80 02 04          # rnd32 ; weight
+          05 03 00 00     # act_set
+        80 03 0a          # rnd32 ; weight
+          05 03 0f 00     # act_set
+      80 ff               # rnd32 ; RND end
+    0b 02                 # mode_ck ; ENDIF
+    ff 00                 # END
+  39 02                   # eye_dmg_ck ; ENDIF
+ 79 02                    # unique_sel ; default
+   39 00                  # eye_dmg_ck ; IF
+     0b 00 00             # mode_ck ; IF
+       05 00 06 00        # act_set
+     0b 01                # mode_ck ; ELSE
+       80 00 03           # rnd32 ; RND header
+         80 01 10         # rnd32 ; weight
+           05 00 11 00    # act_set
+         80 02 08         # rnd32 ; weight
+           05 03 06 00    # act_set
+         80 03 08         # rnd32 ; weight
+           05 03 03 00    # act_set
+       80 ff              # rnd32 ; RND end
+     0b 02                # mode_ck ; ENDIF
+     ff 00                # END
+   39 02                  # eye_dmg_ck ; ENDIF
+79 03                     # unique_sel ; SWITCH end
+1b 00 01                  # mind_ck ; IF
+  0c 04 01                # flag_set
+  81 07                   # call contents
+  2b 00 04 01             # flag_ck ; IF
+    ff 00                 # END
+  2b 02                   # flag_ck ; ENDIF
+1b 02                     # mind_ck ; ENDIF
+0b 00 00                  # mode_ck ; IF
+  07 01                   # main_jump
+0b 01                     # mode_ck ; ELSE
+  07 02                   # main_jump
+0b 02                     # mode_ck ; ENDIF
+ff 00                     # END
 ```
 
 With a basic decoder we can make the flow more readable : 
